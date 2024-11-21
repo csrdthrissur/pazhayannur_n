@@ -16,6 +16,8 @@
 <link rel="stylesheet" href="css/nouislider.min.css">
         <link rel="stylesheet" href="css/leaflet-control-geocoder.Geocoder.css">
         <link rel="stylesheet" href="css/leaflet-measure.css">
+		<link rel="stylesheet" href="https://unpkg.com/leaflet-draw/dist/leaflet.draw.css" />
+	<link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" />
         <style>
         html, body, #map {
             width: 100%;
@@ -77,6 +79,8 @@
         <script src="data/Bridge_14.js"></script>
         <script src="data/Building_15.js"></script>
         <script src="data/Node_16.js"></script>
+		<script src="https://unpkg.com/leaflet-draw/dist/leaflet.draw.js"></script>
+<script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
         <script>
         var map = L.map('map', {
             zoomControl:false, maxZoom:28, minZoom:1
@@ -2458,6 +2462,151 @@ binocularsIcon.parentNode.appendChild(textBox);
                 filterFunc();
             };
             div_road_stype.appendChild(reset_road_stype);
+			// Initialize the feature group to store editable layers
+var drawnItems = new L.FeatureGroup();
+map.addLayer(drawnItems);
+
+var currentLine = null; // Store the current polyline being drawn
+var isDrawingLine = false; // Track whether line drawing is active
+
+// Add the Leaflet Draw control to the map
+var drawControl = new L.Control.Draw({
+  position: 'bottomleft', // Set the initial position  
+    edit: {
+        featureGroup: drawnItems
+    },
+    draw: {
+        polyline: true, // Enable polyline drawing
+        marker: true // Allow point markers
+    }
+});
+map.addControl(drawControl);
+
+function saveToLocalStorage() {
+    var savedData = drawnItems.toGeoJSON();
+    localStorage.setItem('drawnShapes', JSON.stringify(savedData));
+}
+
+// Function to load data from localStorage
+function loadFromLocalStorage() {
+    var savedData = JSON.parse(localStorage.getItem('drawnShapes'));
+    if (savedData) {
+        L.geoJSON(savedData, {
+            onEachFeature: function (feature, layer) {
+                drawnItems.addLayer(layer);
+
+                // Enable deletion on click
+                layer.on('click', function() {
+                    var deleteConfirmation = confirm('Do you want to delete this item?');
+                    if (deleteConfirmation) {
+                        drawnItems.removeLayer(layer);
+                        saveToLocalStorage();
+                        alert('Item deleted');
+                    }
+                });
+
+                // Display properties in popup
+                if (feature.properties) {
+                    let popupContent = `
+                        <strong>Name:</strong> ${feature.properties.name}<br>
+                        <strong>ID:</strong> ${feature.properties.id}<br>
+                        <strong>Category:</strong> ${feature.properties.category}<br>
+                        <strong>Type of Work:</strong> ${feature.properties.type_of_work}<br>
+                        <strong>Amount:</strong> ${feature.properties.amount}<br>
+                        <strong>Year:</strong> ${feature.properties.year}
+                    `;
+                    layer.bindPopup(popupContent);
+                }
+            }
+        }).addTo(map);
+    }
+}
+
+// Load saved shapes when the page loads
+loadFromLocalStorage();
+
+// Function to start a new line on mobile
+function startNewLine(latlng) {
+    currentLine = L.polyline([latlng], {
+        color: '#3388ff',
+        weight: 4
+    }).addTo(map);
+    drawnItems.addLayer(currentLine);
+    isDrawingLine = true;
+}
+
+// Function to add a point to the current line
+function addPointToCurrentLine(latlng) {
+    if (currentLine) {
+        currentLine.addLatLng(latlng);
+    }
+}
+
+// Function to finish the current line and save it
+function finishCurrentLine() {
+    if (currentLine) {
+        saveToLocalStorage();
+        currentLine = null;
+        isDrawingLine = false;
+        alert('Line saved.');
+    }
+}
+
+// Mobile tap event for adding points
+map.on('click', function (e) {
+    if (!isDrawingLine) {
+        startNewLine(e.latlng);
+    } else {
+        addPointToCurrentLine(e.latlng);
+    }
+});
+
+// Double-click or long press event to finish the line
+map.on('dblclick', function () {
+    finishCurrentLine();
+});
+
+// Event listener for when a point or line is created
+map.on(L.Draw.Event.CREATED, function (event) {
+    var layer = event.layer;
+    drawnItems.addLayer(layer);
+
+    // Prompt the user for attributes (name, id, category, type of work, amount, and year)
+    var name = prompt('Enter a name for this shape:');
+    var id = prompt('Enter an ID for this shape:');
+    var category = prompt('Enter a category for this shape:');
+    var typeOfWork = prompt('Enter the type of work for this shape:');
+    var amount = prompt('Enter the amount for this shape:');
+    var year = prompt('Enter the year for this shape:');
+
+    layer.feature = layer.feature || {};
+    layer.feature.type = "Feature";
+    layer.feature.properties = {
+        name: name,
+        id: id,
+        category: category,
+        type_of_work: typeOfWork,
+        amount: amount,
+        year: year
+    };
+
+    // Create a popup with all the properties
+    let popupContent = `
+        <strong>Name:</strong> ${name}<br>
+        <strong>ID:</strong> ${id}<br>
+        <strong>Category:</strong> ${category}<br>
+        <strong>Type of Work:</strong> ${typeOfWork}<br>
+        <strong>Amount:</strong> ${amount}<br>
+        <strong>Year:</strong> ${year}
+    `;
+    layer.bindPopup(popupContent);
+
+    saveToLocalStorage();
+});
+
+// Event listener for saving edits and deletions
+map.on(L.Draw.Event.EDITED, saveToLocalStorage);
+map.on(L.Draw.Event.DELETED, saveToLocalStorage);
         </script>
     </body>
 </html>
