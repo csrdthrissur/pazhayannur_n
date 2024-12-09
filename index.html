@@ -2462,25 +2462,68 @@ binocularsIcon.parentNode.appendChild(textBox);
                 filterFunc();
             };
             div_road_stype.appendChild(reset_road_stype);
-						// Initialize the feature group to store editable layers
+					// Initialize the feature group to store editable layers
 var drawnItems = new L.FeatureGroup();
 map.addLayer(drawnItems);
-
-var currentLine = null; // Store the current polyline being drawn
-var isDrawingLine = false; // Track whether line drawing is active
 
 // Add the Leaflet Draw control to the map
 var drawControl = new L.Control.Draw({
     position: 'bottomleft', // Set the initial position
     edit: {
-        featureGroup: drawnItems
+        featureGroup: drawnItems // Allow editing of drawn shapes
     },
     draw: {
         polyline: true, // Enable polyline drawing
-        marker: true // Allow point markers
+        marker: true    // Allow point markers
     }
 });
 map.addControl(drawControl);
+
+// Event listener for when a shape is created
+map.on(L.Draw.Event.CREATED, function (event) {
+    var layer = event.layer;
+    drawnItems.addLayer(layer);
+
+    // Prompt for shape attributes
+    var name = prompt('Enter a name for this shape:');
+    var id = prompt('Enter an ID for this shape:');
+    var category = prompt('Enter a category for this shape:');
+    var typeOfWork = prompt('Enter the type of work for this shape:');
+    var amount = prompt('Enter the amount for this shape:');
+    var year = prompt('Enter the year for this shape:');
+
+    // Attach properties to the feature
+    layer.feature = layer.feature || {};
+    layer.feature.type = "Feature";
+    layer.feature.properties = {
+        name: name,
+        id: id,
+        category: category,
+        type_of_work: typeOfWork,
+        amount: amount,
+        year: year
+    };
+
+    // Create a popup with all the properties
+    let popupContent = `
+        <strong>Name:</strong> ${name}<br>
+        <strong>ID:</strong> ${id}<br>
+        <strong>Category:</strong> ${category}<br>
+        <strong>Type of Work:</strong> ${typeOfWork}<br>
+        <strong>Amount:</strong> ${amount}<br>
+        <strong>Year:</strong> ${year}
+    `;
+    layer.bindPopup(popupContent);
+
+    saveToLocalStorage(); // Save the layer to localStorage
+});
+
+// Event listener for saving edits and deletions
+map.on(L.Draw.Event.EDITED, saveToLocalStorage);
+map.on(L.Draw.Event.DELETED, saveToLocalStorage);
+
+// Remove Custom Line-Drawing Behavior
+// No `map.on('click')` is needed for line drawing anymore
 
 // Function to save shapes to localStorage
 function saveToLocalStorage() {
@@ -2526,83 +2569,6 @@ function loadFromLocalStorage() {
 // Load saved shapes when the page loads
 loadFromLocalStorage();
 
-// Functions for line drawing on mobile
-function startNewLine(latlng) {
-    currentLine = L.polyline([latlng], {
-        color: '#3388ff',
-        weight: 4
-    }).addTo(map);
-    drawnItems.addLayer(currentLine);
-    isDrawingLine = true;
-}
-
-function addPointToCurrentLine(latlng) {
-    if (currentLine) {
-        currentLine.addLatLng(latlng);
-    }
-}
-
-function finishCurrentLine() {
-    if (currentLine) {
-        saveToLocalStorage();
-        currentLine = null;
-        isDrawingLine = false;
-        alert('Line saved.');
-    }
-}
-
-// Mobile tap event for adding points
-map.on('click', function (e) {
-    if (!isDrawingLine) {
-        startNewLine(e.latlng);
-    } else {
-        addPointToCurrentLine(e.latlng);
-    }
-});
-
-// Double-click to finish the line
-map.on('dblclick', function () {
-    finishCurrentLine();
-});
-
-// Event listener for when a shape is created
-map.on(L.Draw.Event.CREATED, function (event) {
-    var layer = event.layer;
-    drawnItems.addLayer(layer);
-
-    // Prompt for shape attributes
-    var name = prompt('Enter a name for this shape:');
-    var id = prompt('Enter an ID for this shape:');
-    var category = prompt('Enter a category for this shape:');
-    var typeOfWork = prompt('Enter the type of work for this shape:');
-    var amount = prompt('Enter the amount for this shape:');
-    var year = prompt('Enter the year for this shape:');
-
-    layer.feature = layer.feature || {};
-    layer.feature.type = "Feature";
-    layer.feature.properties = {
-        name: name,
-        id: id,
-        category: category,
-        type_of_work: typeOfWork,
-        amount: amount,
-        year: year
-    };
-
-    // Create a popup with all the properties
-    let popupContent = `
-        <strong>Name:</strong> ${name}<br>
-        <strong>ID:</strong> ${id}<br>
-        <strong>Category:</strong> ${category}<br>
-        <strong>Type of Work:</strong> ${typeOfWork}<br>
-        <strong>Amount:</strong> ${amount}<br>
-        <strong>Year:</strong> ${year}
-    `;
-    layer.bindPopup(popupContent);
-
-    saveToLocalStorage();
-});
-
 // Event listener for saving edits and deletions
 map.on(L.Draw.Event.EDITED, saveToLocalStorage);
 map.on(L.Draw.Event.DELETED, saveToLocalStorage);
@@ -2643,34 +2609,51 @@ function importData(event) {
     };
     reader.readAsText(file);
 }
-
-// Add Export Button
+// Export Button
 var exportButton = L.control({ position: 'topright' });
 exportButton.onAdd = function () {
     var div = L.DomUtil.create('div', 'leaflet-bar leaflet-control leaflet-control-custom');
-    div.innerHTML = '<a href="#" title="Export Data" style="padding: 4px; background: white; border: 1px solid #ccc;">⬇ Export</a>';
+    div.innerHTML = '<a href="#" title="Export Data" style="padding: 4px; background: white; border: 1px solid #ccc; color: white; text-align: center; display: block;">📤 Export</a>';
     div.style.cursor = 'pointer';
+    div.style.background = '#007bff'; // Button background color (blue)
+    div.style.border = '1px solid #0056b3'; // Button border color
+    div.style.color = 'white'; // Text color white
+    div.style.textAlign = 'center'; // Center align text
     div.onclick = exportData;
     return div;
 };
 exportButton.addTo(map);
 
-// Add Import Button
+// Import Button
 var importButton = L.control({ position: 'topright' });
 importButton.onAdd = function () {
     var div = L.DomUtil.create('div', 'leaflet-bar leaflet-control leaflet-control-custom');
+    div.innerHTML = '<a href="#" title="Import Data" style="padding: 4px; background: white; border: 1px solid #ccc; color: white; text-align: center; display: block;">📥 Import</a>';
+    div.style.cursor = 'pointer';
+    div.style.background = '#28a745'; // Button background color (green)
+    div.style.border = '1px solid #1e7e34'; // Button border color
+    div.style.color = 'white'; // Text color white
+    div.style.textAlign = 'center'; // Center align text
+    div.style.marginTop = '14px'; // Add margin to move the button down slightly
+
+    // Create an invisible file input element
     var input = document.createElement('input');
     input.type = 'file';
     input.accept = '.geojson';
-    input.style.opacity = '0';
-    input.style.position = 'absolute';
-    input.onchange = importData;
+    input.style.opacity = '0'; // Make it invisible
+    input.style.width = '0';   // Prevent it from occupying space
+    input.style.height = '0';  // Prevent it from occupying space
+    input.style.position = 'absolute'; // Position it absolutely within the container
+    input.style.top = '0';     // Align it to the top
+    input.style.left = '0';    // Align it to the left
+    input.onchange = importData; // Attach the import handler
 
-    div.innerHTML = '<a href="#" title="Import Data" style="padding: 4px; background: white; border: 1px solid #ccc;">⬆ Import</a>';
-    div.style.cursor = 'pointer';
-    div.onclick = () => input.click();
+    div.onclick = (e) => {
+        e.stopPropagation(); // Prevent the click from propagating to the map
+        input.click();       // Open the file dialog
+    };
 
-    div.appendChild(input);
+    div.appendChild(input); // Add the input to the button
     return div;
 };
 importButton.addTo(map);
